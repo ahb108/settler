@@ -100,3 +100,42 @@ mapElements <- function(x, y, scalesize, scalelabel, cex.label=0.75, type.north=
     text(x, y, labels=scalelabel, cex=cex.label)
 
 }
+
+#' @export
+#' 
+pieSymbols <- function (x, y, values, sizes=NULL, labels=names(x), edges=360, clockwise=FALSE, init.angle=if(clockwise) 90 else 0, density=NULL, angle=45, col=NULL, border=NULL, lty=NULL, main=NULL, ...){
+    ## This is a modification of the basic pie() function to allow overplotting on map data
+    t2xy <- function(t){
+        t2p <- twopi * t + init.angle * pi/180
+        list(x=r * cos(t2p), y=r * sin(t2p))
+    }
+    for (a in 1:nrow(values)){
+        v <- values[a,]
+        if (is.null(sizes)){
+            sizes <- rep((max(y)-min(y))/3,length(sizes))
+        } else if (length(sizes)==1){
+            r <- rep(sizes,length(sizes))
+        } else {
+            r <- sizes[a]
+        }
+        if (!is.numeric(v) || any(is.na(v) | v < 0)){ 
+            stop("values must be positive and numeric.")
+        }
+        v <- c(0, cumsum(v)/sum(v))
+        dv <- diff(v)
+        nv <- length(dv)
+        if (!is.null(border)){ border <- rep_len(border, nv) }
+        if (!is.null(lty)){ 
+            lty <- rep_len(lty, nv)
+            angle <- rep(angle, nv)
+        }
+        if (!is.null(density)){ density <- rep_len(density, nv) }
+        if (clockwise){ twopi <- -2 * pi } else { twopi <- 2 * pi }
+        for (i in 1L:nv) {
+            n <- max(2, floor(edges * dv[i]))
+            P <- t2xy(seq.int(v[i], v[i + 1], length.out=n))
+            polygon(c(x[a]+P$x,x[a]), c(y[a]+P$y,y[a]), density=density[i], angle=angle[i], 
+                    border=border[i], col=col[i], lty=lty[i])
+        }
+    }
+}
