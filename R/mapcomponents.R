@@ -151,9 +151,9 @@ pieSymbols <- function (x, y, values, sizes=NULL, labels=names(x), edges=360, cl
 #' @export
 #' 
 arrangeSymbols <- function(x, plotsizes, method="buffers1"){
-    names(plotsizes) <- polyids
     sitebuffs <- gBuffer(x, width=plotsizes, byid=TRUE)
     polyids <- sapply(slot(sitebuffs, "polygons"), function(x) slot(x, "ID"))
+    names(plotsizes) <- polyids
     nogozone <- gBuffer(x, width=max(plotsizes))    
     overlapcheck <- rowSums(gOverlaps(sitebuffs, byid=TRUE)) > 0
     overlaps <- x[overlapcheck,]
