@@ -163,7 +163,7 @@ arrangeSymbols <- function(x, plotsizes){
             res <- spRbind(res,buff)
         } else {
             tmp1 <- gBuffer(res, width=overlapssizes[a])
-            tmp2 <- gBuffer(tmp2, width=overlapssizes[a])
+            tmp2 <- gBuffer(tmp1, width=overlapssizes[a])
             newareas <- gDifference(tmp2,tmp1)
             set.seed(123)
             pts <- spsample(newareas,1000, type="random")
