@@ -139,3 +139,42 @@ pieSymbols <- function (x, y, values, sizes=NULL, labels=names(x), edges=360, cl
         }
     }
 }
+
+#' @export
+#' 
+arrangeSymbols <- function(x, y, size){
+    sitebuffs <- gBuffer(x, width=plotsizes, byid=TRUE)
+    polyids <- sapply(slot(sitebuffs, "polygons"), function(x) slot(x, "ID")) 
+    overlapcheck <- rowSums(gOverlaps(sitebuffs, byid=TRUE)) > 0
+    overlaps <- x[overlapcheck,]
+    overlapids <- polyids[overlapcheck]
+    nonoverlaps <- x[!overlapcheck,]
+    nooverlapsbuff <- sitebuffs[!overlapcheck,]
+    overlapssizes <- plotsizes[overlapcheck]
+    overlaps <- overlaps[order(overlapssizes),]
+    overlapssizes <- overlapssizes[order(overlapssizes)]
+    res <- nooverlapsbuff
+    sizeorder <- rank(-overlapssizes, ties.method="first")
+    for (a in 1:nrow(overlaps)){
+        buff <- gBuffer(overlaps[a,], width=overlapssizes[a], byid=TRUE)
+        nonoverlapcheck <- is.null(gIntersection(res,buff))
+        if (nonoverlapcheck){
+            buff <- spChFIDs(buff,overlapids[a])
+            res <- spRbind(res,buff)
+        } else {
+            tmp1 <- gBuffer(res, width=overlapssizes[a])
+            tmp2 <- gBuffer(tmp2, width=overlapssizes[a])
+            newareas <- gDifference(tmp2,tmp1)
+            set.seed(123)
+            pts <- spsample(newareas,1000, type="random")
+            nearest <- which.min(gDistance(overlaps[a,], pts, byid=TRUE))
+            newpt <- pts[nearest,]
+            newbuff <- gBuffer(newpt, width=overlapssizes[a])
+            newbuff <- spChFIDs(newbuff,overlapids[a])
+            res <- spRbind(res,newbuff)
+        }
+    }
+    res <- coordinates(res)
+    res <- res[order(as.numeric(row.names(res))), ]
+    return(res)
+}
