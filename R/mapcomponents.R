@@ -140,41 +140,81 @@ pieSymbols <- function (x, y, values, sizes=NULL, labels=names(x), edges=360, cl
     }
 }
 
+#' Rearrange the location of those symbols that overalap with each other on a map.
+#'
+#' This function takes the orginal plot locations and suggests new locations that avoid each other, given a stated plotting size for each symbol. 
+#'
+#' @param x a SpatialPoints* object
+#' @param plotsizes a vector of sizes (typically radii or perhaps half a bounding box) for the plotted symbols 
+#' 
+#' @return matrix of new suggested x and y locations for the centre of each plot symbol.
 #' @export
 #' 
 arrangeSymbols <- function(x, plotsizes, method="buffers1"){
     sitebuffs <- gBuffer(x, width=plotsizes, byid=TRUE)
-    polyids <- sapply(slot(sitebuffs, "polygons"), function(x) slot(x, "ID")) 
+    polyids <- sapply(slot(sitebuffs, "polygons"), function(x) slot(x, "ID"))
+    nogozone <- gBuffer(x, width=max(plotsizes))    
     overlapcheck <- rowSums(gOverlaps(sitebuffs, byid=TRUE)) > 0
     overlaps <- x[overlapcheck,]
-    overlapids <- polyids[overlapcheck]
+    ## overlapids <- polyids[overlapcheck]
     nonoverlaps <- x[!overlapcheck,]
     nooverlapsbuff <- sitebuffs[!overlapcheck,]
     overlapssizes <- plotsizes[overlapcheck]
     overlaps <- overlaps[order(overlapssizes),]
     overlapssizes <- overlapssizes[order(overlapssizes)]
     res <- nooverlapsbuff
-    sizeorder <- rank(-overlapssizes, ties.method="first")
-    for (a in 1:nrow(overlaps)){
-        buff <- gBuffer(overlaps[a,], width=overlapssizes[a], byid=TRUE)
-        nonoverlapcheck <- is.null(gIntersection(res,buff))
+    sizeorder <- names(sort(overlapssizes, decreasing=TRUE))
+    for (a in 1:length(sizeorder)){
+        buff <- gBuffer(overlaps[sizeorder[a],], width=overlapssizes[sizeorder[a]], byid=TRUE)
+        nonoverlapcheck <- is.null(gIntersection(nogozone,buff))
         if (nonoverlapcheck){
-            buff <- spChFIDs(buff,overlapids[a])
+            buff <- spChFIDs(buff,sizeorder[a])
             res <- spRbind(res,buff)
+            nogozone <- spRbind(nogozone,buff)
         } else {
-            tmp1 <- gBuffer(res, width=overlapssizes[a])
-            tmp2 <- gBuffer(tmp1, width=overlapssizes[a])
+            tmp1 <- gBuffer(nogozone, width=overlapssizes[sizeorder[a]])
+            tmp2 <- gBuffer(tmp1, width=overlapssizes[sizeorder[a]])
             newareas <- gDifference(tmp2,tmp1)
             set.seed(123)
             pts <- spsample(newareas,1000, type="random")
-            nearest <- which.min(gDistance(overlaps[a,], pts, byid=TRUE))
+            nearest <- which.min(gDistance(overlaps[sizeorder[a],], pts, byid=TRUE))
             newpt <- pts[nearest,]
-            newbuff <- gBuffer(newpt, width=overlapssizes[a])
-            newbuff <- spChFIDs(newbuff,overlapids[a])
+            newbuff <- gBuffer(newpt, width=overlapssizes[sizeorder[a]])
+            newbuff <- spChFIDs(newbuff,sizeorder[a])
             res <- spRbind(res,newbuff)
+            nogozone <- spRbind(nogozone,newbuff)
         }
     }
     res <- coordinates(res)
-    res <- res[order(as.numeric(row.names(res))), ]
+    res <- as.data.frame(res[order(as.numeric(row.names(res))), ], stringsAsFactors=FALSE)
     return(res)
+}
+
+#' Produce flyout lines for where mapped pies and other charts need to avoid overlapping.
+#'
+#' This function takes the orginal plot locations and the suggested new plot locations created by arrangeSymbols and creates lines between them that can be plotted. 
+#'
+#' @param x a vector of x coordinates for the original locations
+#' @param y a vector of y coordinates for the original locations
+#' @param xplot a vector of x coordinates for where the charts will actually be plotted.
+#' @param yplot a vector of y coordinates for where the charts will actually be plotted.
+#' 
+#' @return SpatialLines
+#' @export
+#' 
+flylines <- function(x, y, xplot, yplot){
+    fl <- NULL
+    for (a in 1:length(x)){
+        xmid <- mean(c(x[a],xplot[a]))
+        ymid <- mean(c(y[a],yplot[a]))
+        tmp <- cbind(c(x[a], xmid, xplot[a]),c(y[a], ymid, yplot[a]))
+        newSL <- SpatialLines(list(Lines(list(Line(tmp)),a)))
+        newSL <- spChFIDs(newSL, as.character(a))
+        if (a!=1 & !is.null(fl)){
+            fl <- spRbind(fl,newSL)
+        } else {
+            fl <- newSL
+        }
+    }
+    return(fl)
 }
