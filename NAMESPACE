@@ -2,5 +2,7 @@
 
 export(BCADtoBP)
 export(BPtoBCAD)
+export(ngrResolution)
 export(ngrResolve)
 export(siteCount)
+export(xyTransform)
